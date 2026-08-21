@@ -1,6 +1,6 @@
 # Where the last-reviewed commit SHA can live
 
-Status: open
+Status: closed
 Labels: wayfinder:ticket, wayfinder:research
 Parent: ../MAP.md
 Assignee: unassigned
@@ -27,3 +27,107 @@ Confirm what is actually possible for a bot account through GitLab API v4:
 If the doc's stated mechanism turns out not to exist, say so plainly. Per the map's
 Notes, that gets raised rather than quietly redesigned. This also feeds the feedback
 correlation ticket, which needs the same answer about marker metadata.
+
+## Finding: idea.md S2's mechanism does not exist
+
+Documentation study, 2026-08-21. No live API calls: the sandbox from
+[05-provision-local-sandbox.md](05-provision-local-sandbox.md) does not exist yet.
+Full evidence, alternatives table, and a 13-item live-check list:
+`data/janus-shastore-t3/report.md` in the firstmate home.
+
+Two independent findings, both from official docs:
+
+1. **A bot cannot create a system note.** There is no `system` parameter on
+   `POST /projects/:id/merge_requests/:merge_request_iid/notes`, nor on GraphQL
+   `CreateNoteInput`. `system` appears only in response bodies. The Notes API page
+   frames system notes as read-only ("**Retrieve** system-generated notes about
+   object changes"). Some are not even notes - they are separate read-only
+   resource-event resources.
+2. **Nothing on a merge request is hidden from its reviewers.** Internal notes come
+   closest but are visible to any Reporter-and-above with an "Internal note" badge,
+   which is every human reviewing the MR. MR-level custom attributes do not exist
+   (the Custom Attributes API covers users, groups, and projects only, and is
+   admin-only). Labels and the description are fully visible and both cost the
+   Developer role.
+
+One genuinely hidden channel does exist and was not on this ticket's list:
+**unpublished draft notes**, which are "visible only to the author", free tier,
+full CRUD on the MR. It is not a system note and is not what S2 described.
+
+## Decision
+
+**Adopt an HTML-comment marker carrying a JSON payload, embedded by application
+code in every comment the bot posts.**
+
+```
+<!-- ai-reviewer:{"v":1,"review_id":"…","persona":"fast","head_sha":"…","category":"…"} -->
+```
+
+GitLab Flavored Markdown documents this exact use: HTML comments are invisible in
+rendered output, and "Add metadata or processing instructions" is a listed purpose.
+
+### Why
+
+1. **One mechanism serves tickets 03, 06, 09 and part of 12.** Storing the
+   last-reviewed SHA and attributing a reaction to a review are the same problem:
+   attach machine-readable data to a bot comment and read it back. Ticket 12's
+   crash-safe re-run needs the same review id.
+2. **No role escalation and no S4 whitelist amendment.** It is the body of a comment
+   S4 already permits, written at the role S6 already asks for. The description and
+   label options both need the Developer role; draft notes need a whitelist change.
+3. **It fails safe.** A missing marker - deleted comment, first-ever review, format
+   change - means no last-reviewed SHA, so the job performs a full review. Correct
+   fallback, costs only tokens.
+4. **Read cost is one API call** in the typical case
+   (`GET .../notes?per_page=100`, newest-first, filter client-side on author and
+   marker). It degrades to `ceil(N/100)` calls on a very chatty MR. There is no
+   server-side author filter on the notes list.
+
+### The marker is transport, not storage
+
+DuckDB still holds the durable record. The bot embeds metadata in the comment; the
+S6 poller reads it and writes rows; the curator queries DuckDB. The marker is what
+makes the table fillable, not an alternative to it.
+
+### Cost accepted
+
+The marker is invisible in the rendered comment but readable by anyone who opens the
+Markdown source or the API. Everything it carries - a commit SHA, a review id, a
+persona name, a finding category - is non-sensitive, so this is cosmetic.
+
+The real cost is that the SHA lives on a **mutable, human-editable surface**: a
+reviewer who deletes the bot's summary comment destroys it. The fallback above makes
+that safe rather than free. Whether to remove that fragility by giving the review job
+a real store is deferred to
+[13-revisit-external-storage.md](13-revisit-external-storage.md).
+
+### Rejected
+
+| Option | Why not |
+|---|---|
+| System note (S2 as written) | Impossible - no write path exists |
+| MR custom attribute | No such resource; admin-only where it does exist |
+| Unpublished draft note | Genuinely hidden and a guaranteed one-call read, but does not generalise to ticket 06 (needs a fragile note-id manifest), needs an S4 whitelist amendment, and is hostile to `bulk_publish`. Worth a live test in ticket 05 as a possible later optimisation for the SHA alone. |
+| Internal note | Visible to every reviewer with a badge; no read-cost saving over the marker |
+| Plain visible marker comment | Doubles the comment count per review |
+| MR description | Developer role; not in S4's whitelist; clobbers S3's persona slash command; lost-update race |
+| Label | Developer role to assign; accumulates one label per review; auto-replacing scoped labels are Premium |
+| Read `position.head_sha` off the bot's own diff notes | Fails whenever a review produced zero inline findings - exactly what `fast` is built to do. Corroborating signal only. |
+
+## Also established, for the tickets downstream
+
+- **Ticket 06 discovery.** Searching for the bot's notes at global or group scope
+  needs the `notes` search scope, which is Premium/Ultimate and requires advanced
+  search - unavailable on the free namespace ticket 05 provisions. The free,
+  fixed-cost path is
+  `GET /merge_requests?scope=all&state=all&updated_after=<cursor>&order_by=updated_at`.
+  `scope` defaults to `created_by_me`, which returns nothing for a bot that authors
+  no MRs, so `scope=all` is mandatory. Posting a note bumps `updated_at`, so the
+  cursor catches both new reviews and new reactions.
+- **The poller should probably use GraphQL.** REST reads reactions per note
+  (`GET .../notes/:note_id/award_emoji`), which is O(bot comments) round trips.
+  GraphQL's `MergeRequest.notes` connection exposes `body` and `awardEmoji` together,
+  so one query returns markers and reactions at once - making the marker cost the
+  poller nothing extra.
+- **Ticket 07 natural key.** `(project_id, merge_request_iid, note_id)` identifies a
+  comment; `review_id` from the marker groups a review's comments.

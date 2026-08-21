@@ -41,17 +41,33 @@ from fog.
   everything before the call and posts every comment itself. §4's tool whitelist is
   a guardrail on the application, not a toolbox given to the model. No agent
   framework. See [01-agent-architecture.md](issues/01-agent-architecture.md).
+- **Inline comment positioning: documented, and S9 is free.** Added lines send only
+  `new_line`, removed lines only `old_line`, unchanged context lines both. A stale
+  position is rejected with a 400 rather than becoming an outdated thread, while a
+  thread that goes stale *later* survives untouched - which is GitLab's default, so
+  S9 needs no code at all. Posting is inherently non-atomic. See
+  [02-inline-comment-positioning.md](issues/02-inline-comment-positioning.md).
+- **Comment metadata: an HTML-comment JSON marker, minted by code.** §2's
+  "hidden/system note" does not exist - a bot cannot create a system note, and no MR
+  channel is hidden from Reporter-and-above reviewers. One marker embedded in every
+  comment the bot posts carries the last-reviewed SHA, review id, persona, and finding
+  category, serving tickets 03, 06, 09 and part of 12 at once. DuckDB still holds the
+  durable record; the marker is transport, not storage. See
+  [03-last-reviewed-sha-storage.md](issues/03-last-reviewed-sha-storage.md), with the
+  deferred counter-proposal in
+  [13-revisit-external-storage.md](issues/13-revisit-external-storage.md).
 
 ## Not yet specified
 
 <!-- in-scope fog: coming, but not yet sharp enough to ticket -->
 
 - **Build sequencing.** The skeleton needs cutting into vertical slices with an
-  order. Architecture (01) has closed; graduates when the correlation ticket (06)
-  closes too.
+  order. Architecture (01) has closed and the correlation ticket (06) is now
+  unblocked; graduates when 06 closes.
 - **Error taxonomy and the `logs` table.** §4 promises a "review could not complete"
   comment and a `logs` row, but the failure categories are unnamed. Shape depends on
-  the DuckDB schema.
+  the DuckDB schema. Ticket 12 supplies one strong candidate category (a rejected
+  comment position) and ticket 02 supplies a second (a rate-limit 429 mid-review).
 - **Testing approach.** Partly cleared by 01: a pure-function review job can be
   replayed offline against a recorded diff, with no GitLab and no real MR. Still
   open is whether review *quality* gets any check at all beyond eyeballing.

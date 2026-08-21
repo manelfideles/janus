@@ -43,6 +43,13 @@ Checked against GitLab API v4 docs during the 01 grilling session:
      gate needs it.
 - Therefore a pre-fetch gate is only possible if the unit is changed files, and
   even then it is unreliable on a fresh MR.
+- **This is not the only field with that behaviour.** Ticket 02 found that
+  `diff_refs` - which supplies the `base_sha` / `head_sha` / `start_sha` an inline
+  comment's `position` requires - is *also* empty right after MR creation and
+  populates asynchronously. S2 runs the full review on MR creation, so the job
+  lands in that gap for both fields. The `/versions` endpoint may not share the
+  delay; ticket 02 queued that as a live check. Whoever builds the fetch step needs
+  one story that covers both, not two workarounds.
 
 ## Why the unit is the real question
 
