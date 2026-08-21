@@ -1,0 +1,74 @@
+[project]
+name = "janus"
+version = "0.1.0"
+description = "AI-assisted code review for GitLab merge requests"
+requires-python = ">=3.13,<3.14"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+ai-reviewer-core = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "ai-reviewer-core",
+    "hypothesis>=6.140",
+    "mypy>=1.18",
+    "pytest>=8.4",
+    "ruff>=0.14",
+]
+
+# ---------------------------------------------------------------- ruff
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["packages/core/src"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # import sorting
+    "B",    # bugbear
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+    "ANN",  # missing annotations
+    "PT",   # pytest style
+    "TID",  # tidy imports
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test helpers are exercised, not called by name, so the return annotation adds nothing.
+"**/tests/**" = ["ANN401"]
+
+# ---------------------------------------------------------------- mypy
+
+[tool.mypy]
+python_version = "3.13"
+files = ["packages"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+# Baseline for packages other than `core`, which is stricter below (ticket 04).
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+# `core` owns the marker format and the shared models that tickets 03, 06, 07, 09
+# and 12 all depend on, so it is the one place a type error costs real debugging.
+module = "ai_reviewer_core.*"
+strict = true
+
+# ---------------------------------------------------------------- pytest
+
+[tool.pytest.ini_options]
+testpaths = ["packages"]
+# importlib mode keeps same-named test modules in different packages from clashing.
+addopts = "--import-mode=importlib -q"
