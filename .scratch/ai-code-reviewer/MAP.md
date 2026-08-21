@@ -56,6 +56,12 @@ from fog.
   [03-last-reviewed-sha-storage.md](issues/03-last-reviewed-sha-storage.md), with the
   deferred counter-proposal in
   [13-revisit-external-storage.md](issues/13-revisit-external-storage.md).
+- **Stack and layout: Python 3.13 on a uv workspace of three packages.** `core`
+  (shared models, marker format, GitLab client, config), `reviewer` (the CI image),
+  `collector` (the EC2 poller), with personas at the root as an input to the image.
+  The split makes §6's single-writer rule structural: the review job's dependencies
+  cannot reach the store. pytest colocated per package, ruff, mypy strict on `core`.
+  See [04-project-stack-and-layout.md](issues/04-project-stack-and-layout.md).
 
 ## Not yet specified
 
@@ -73,7 +79,9 @@ from fog.
   open is whether review *quality* gets any check at all beyond eyeballing.
 - **Model choice and cost per review** for the local path.
 - **Config surface.** The 12-factor env var list that swaps local for prod (§12).
+  Ticket 04 placed its owner in `packages/core`; the variable list itself is still open.
 - **Docker Compose composition** — which services, and how the CI job relates to them.
+  Ticket 04 gave `compose.yaml` a home at the repo root but deliberately no contents.
 - **ADRs.** §10 asks for a Nygard-style ADR batch. The decisions this map makes are
   the natural input; sequencing and template are unspecified.
 
