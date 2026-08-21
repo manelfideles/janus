@@ -1,6 +1,6 @@
 # Comment posting policy: partial failure, retries, and the API budget
 
-Status: open
+Status: closed
 Labels: wayfinder:ticket, wayfinder:grilling
 Parent: ../MAP.md
 Assignee: unassigned
@@ -79,3 +79,75 @@ Recommendation to argue with: **best-effort posting that never stops on a
 deterministic rejection**, bounded backoff on transient ones, a review id in every
 comment for crash-safe re-runs, and a summary comment that states the count when it
 is not the full set.
+
+## Policy
+
+Full classification table, citations, and a build-now-versus-defer split:
+`data/janus-postpolicy-t12/report.md` in the firstmate home.
+
+### Classification gained a second axis
+
+Not just deterministic versus transient - also **scope**:
+
+- `comment` scope: skip this one, keep posting.
+- `review` scope: **stop posting entirely.**
+
+`401`, `403 insufficient scope`, and `404` are review-scoped: post **nothing at all**
+rather than skipping and continuing. A credential or project problem is not a
+per-comment failure, and continuing would produce a partial review for a reason that
+has nothing to do with the code.
+
+`400 Maximum number of comments exceeded` is also review-scoped.
+
+**Defaults for anything unrecognised: 4xx deterministic, 5xx and transport transient.**
+
+### Backoff
+
+3 attempts per comment, jittered, worst case ~6s. A 429 honours `Retry-After` and
+retries once; a **second** 429 anywhere in the review stops the inline loop.
+**Global posting-phase cap: 180s wall clock**, checked before every attempt and every
+sleep. That is 30% of the *minimum* job timeout GitLab permits, so the retry budget
+cannot outlive its own job at any legal timeout.
+
+### Degradation
+
+A finding whose position is rejected is **listed in the summary comment**, not posted
+as a `position_type=file` note. Zero extra API calls, one scannable list instead of
+several unanchored comments, and no dependency on an undocumented payload shape.
+`position_type=file` remains the documented upgrade if reviewers ask for it.
+
+Findings rejected because of a *janus* bug (invalid payload, note eaten as a quick
+action) are **not** listed - telling a reviewer "could not place this finding" would
+send them looking at their own code. They count toward the shortfall and get a `logs`
+row.
+
+### Idempotency - the key in this ticket's question was one field short
+
+`review_id` **cannot** deduplicate: a re-run mints a new one. The marker gains
+`fid = sha256(new_path|old_path|line_kind|line_number|category)[:12]`, which is
+content-independent and therefore survives the model rewording the same finding.
+
+Key = **`(head_sha, fid)`**. At the start of the posting phase, read the bot's own
+notes, parse markers, build the set, skip anything already in it. Same commit means
+skip; a different `head_sha` is not in the set, so nothing is suppressed and ticket 09
+decides whether the finding exists at all.
+
+**Cost: zero additional requests.** It is a read tickets 03 and 09 already make.
+
+### Ordering
+
+Inline comments first in stable diff order, **summary comment last, one summary.** No
+placeholder-then-edit, because S4's whitelist excludes edit operations. The
+"inline comments with no summary" crash state is transient - the pipeline re-run
+completes it, because of the idempotency check above.
+
+### The 429 trap is defused
+
+Ticket 02 recorded GitLab.com's 60-notes-per-minute creation limit as invisible in
+response headers. At source level **that limit does not apply to inline diff
+comments**, which removes the preventive-throttling question for the skeleton.
+React to a 429, do not pace for it.
+
+### Open
+
+One captain decision remains: whether the summary comment admits a partial post.

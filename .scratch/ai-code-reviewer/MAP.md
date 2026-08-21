@@ -62,6 +62,21 @@ from fog.
   The split makes §6's single-writer rule structural: the review job's dependencies
   cannot reach the store. pytest colocated per package, ruff, mypy strict on `core`.
   See [04-project-stack-and-layout.md](issues/04-project-stack-and-layout.md).
+- **Diff-size cap: 60,000 tokens, counted with Anthropic's free `count_tokens`.**
+  `fast` lowers it to 20,000; overrides may only lower. ~$0.50 worst case per review
+  on the priciest assumed model. This removes `changes_count` from the design and
+  answers ticket 11 outright: the cap is 6.75% of Opus 5's context, so a whole-diff
+  call cannot overflow and per-file chunking solves nothing. Also found that §4's
+  non-blocking promise has a hole - a timeout or crash fails the job and blocks
+  merges - closed by `allow_failure: true`. See
+  [10-diff-size-cap.md](issues/10-diff-size-cap.md).
+- **Comment posting is best-effort, with a scope axis.** 4xx deterministic, 5xx
+  transient, but `401`/`403`/`404` are review-scoped: post nothing at all rather than
+  a partial review. Unplaced findings are listed in the summary rather than posted as
+  file-level notes. Crash-safe on `(head_sha, fid)` at zero extra API cost - the
+  marker needed a content-independent finding id, because `review_id` cannot
+  deduplicate. Summary last. See
+  [12-comment-posting-policy.md](issues/12-comment-posting-policy.md).
 
 ## Not yet specified
 
@@ -77,7 +92,9 @@ from fog.
 - **Testing approach.** Partly cleared by 01: a pure-function review job can be
   replayed offline against a recorded diff, with no GitLab and no real MR. Still
   open is whether review *quality* gets any check at all beyond eyeballing.
-- **Model choice and cost per review** for the local path.
+- **Model choice and cost per review** for the local path. Ticket 10 bounded the
+  worst case (~$0.50/review, ~$0.15 on `fast`) under an explicitly assumed model, and
+  deliberately left the model choice itself open.
 - **Config surface.** The 12-factor env var list that swaps local for prod (§12).
   Ticket 04 placed its owner in `packages/core`; the variable list itself is still open.
 - **Docker Compose composition** — which services, and how the CI job relates to them.
