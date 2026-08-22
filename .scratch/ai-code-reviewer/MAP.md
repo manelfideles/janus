@@ -60,7 +60,9 @@ from fog.
   (shared models, marker format, GitLab client, config), `reviewer` (the CI image),
   `collector` (the EC2 poller), with personas at the root as an input to the image.
   The split makes §6's single-writer rule structural: the review job's dependencies
-  cannot reach the store. pytest colocated per package, ruff, mypy strict on `core`.
+  cannot reach the store. pytest colocated per package, ruff for linting and `ty`
+  for type checking, with the package at `packages/core/janus_core/` and no `src/`
+  layer (amended 2026-08-22).
   See [04-project-stack-and-layout.md](issues/04-project-stack-and-layout.md).
 - **Diff-size cap: 60,000 tokens, counted with Anthropic's free `count_tokens`.**
   `fast` lowers it to 20,000; overrides may only lower. ~$0.50 worst case per review

@@ -104,3 +104,74 @@ S8's stated goal was avoiding "unnecessary rebuilds/redeploys of the unrelated h
 ### Deliberately not settled here
 
 `compose.yaml` has a home in the layout but no contents. **Which services the local stack runs** remains unspecified fog on the map (S12 requires the collector, DuckDB as a plain file, and a MinIO container; how the CI job relates to them is open).
+
+## Amendment, 2026-08-22
+
+Two parts of the decision above are superseded. The original text is left in place
+because the reasoning behind the three-package split is unchanged and still load-bearing;
+only the layout depth and the type-checking tool moved.
+
+### Layout: no `src/` layer, and the import name is `janus_core`
+
+```
+packages/core/janus_core/__init__.py
+packages/core/janus_core/marker.py
+packages/core/janus_core/models.py
+packages/core/janus_core/config.py
+packages/core/tests/...
+```
+
+Distribution `janus-core`, import `janus_core`. The `src/<import_name>/` form recorded
+above is dropped.
+
+**Why.** The captain found `packages/core/src/ai_reviewer_core/marker.py` needlessly
+deep and flattened it to bare top-level modules (`from marker import ...`). Two facts
+settled where it landed, both verified rather than assumed:
+
+1. **uv's build backend cannot package bare top-level modules.** It requires a directory
+   package: `Expected a Python module at: src/<name>/__init__.py`. Setting `module-name`
+   does not help - it just demands that directory under the new name. Bare modules would
+   need a different build backend (hatchling with a hand-maintained `only-include` list
+   works) or no packaging at all.
+2. **Bare generic module names collide across the three packages.** `reviewer` and
+   `collector` will each want a `config.py`. Two modules named `config` installed into
+   one environment resolve by `sys.path` order, silently and wrongly. `marker` and
+   `models` are generic enough to collide with third-party distributions too.
+
+Dropping `src/` rather than the package name gives the captain **exactly the file depth
+they wanted** - `packages/core/janus_core/marker.py` is the same depth as
+`packages/core/src/marker.py` - with no build-backend change and no collision. The
+`src/` layer was what cost the depth, not the package name.
+
+### Type checking: `ty`, not mypy. Linting stays ruff with the same rules.
+
+mypy is removed entirely, on the captain's instruction. `ty` (Astral's type checker)
+replaces it.
+
+The ruff rule selection is **unchanged** - `E W F I B UP SIM RUF ANN PT TID`. The
+captain's instruction was explicit that the rules stay and only the tooling differs.
+
+One distinction worth keeping straight, because it is easy to lose: ruff's `ANN` rules
+only check that annotations are **present**. mypy was checking they were **correct**.
+`ty` is what replaces that second half. So `ANN` stays in ruff as the annotations-exist
+gate, and `ty` does the checking. The "strict on `core`, looser elsewhere" intent above
+is reproduced with `ty` as far as `ty` supports it; `ty` is young, and any part of the old
+strictness that could not be reproduced is recorded in the pull request rather than
+quietly dropped.
+
+### A Makefile is the entry point
+
+Four targets, following the captain's existing convention in
+`aih-model-analysis-dashboard`: `test` (least verbose useful output), `typecheck`,
+`lint`, `lint_fix`.
+
+The Makefile deliberately does **not** invoke `rtk`. rtk exists to compress command
+output for an agent's context, so putting it inside the Makefile would compress it for
+the human at the terminal too, hiding detail they may want. The Makefile stays plain and
+the wrapper is the caller's choice; the project's `AGENTS.md` records how an agent should
+wrap these targets.
+
+### codegraph
+
+The repository is indexed with `codegraph` for symbol and call-graph lookup. The index is
+a local artefact and is gitignored, not shared source.
