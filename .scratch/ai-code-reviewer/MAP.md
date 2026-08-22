@@ -77,6 +77,15 @@ from fog.
   marker needed a content-independent finding id, because `review_id` cannot
   deduplicate. Summary last. See
   [12-comment-posting-policy.md](issues/12-comment-posting-policy.md).
+- **Prompt and personas: drafted, exercised, and corrected.** Running the draft against
+  four diffs found three defects in it. Settled: assume every repo already lints (no
+  detection) with a consequence carve-out for data loss, security, and broken
+  interfaces; clarity nits are per-persona and `fast` stays defects-only; `fast` gains
+  performance at blocker severity; the summary is a code template except for one
+  model-written sentence on a clean review. The persona schema gains exactly one field,
+  `categories`, because a machine-readable vocabulary is forced by tickets 03/06/07/12 -
+  §3's free-prose `review_focus` is unchanged. See
+  [08-prompt-and-persona-draft.md](issues/08-prompt-and-persona-draft.md).
 
 ## Not yet specified
 

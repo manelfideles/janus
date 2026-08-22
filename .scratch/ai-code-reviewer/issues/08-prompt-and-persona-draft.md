@@ -1,6 +1,6 @@
 # First draft of the system prompt and persona YAML
 
-Status: open
+Status: closed
 Labels: wayfinder:ticket, wayfinder:prototype
 Parent: ../MAP.md
 Assignee: unassigned
@@ -53,3 +53,86 @@ Two knock-on constraints:
 The summary comment still needs its persona statement and re-run hint per S3, and it
 is also the only place a partial-post count could be reported - see
 [12-comment-posting-policy.md](12-comment-posting-policy.md).
+
+## Draft produced, exercised, and argued with
+
+Artefacts (in the firstmate home, `data/janus-prompt-t8/`): `system-prompt.md`,
+`fast.yaml`, `backend.yaml`, `output-schema.md`, `rendered-comments.md`, `validate.py`,
+plus `diffs/` and `runs/` holding four test diffs and eight verbatim runs.
+Full write-up: `report.md`.
+
+**Running the draft found three defects in it.** That is the ticket working as
+intended - a draft nobody exercised would have shipped them. All three became
+decisions below.
+
+The report is explicit that it is **self-graded**: the same author wrote the prompt,
+the test diffs, the outputs, and the scoring. An independent pass is scheduled as part
+of landing (see the last decision).
+
+## Decisions
+
+### Captain's calls
+
+**1. Linter overlap - assume every repo already lints, and its CI applies it.**
+No detection, on simplicity grounds. The reviewer proceeds as though lint-class
+findings are covered by a prior pipeline step, which is what S4 already says.
+Firstmate additionally kept a one-sentence carve-out in the system prompt: stay silent
+on what a linter owns **unless the consequence is data loss, a security hole, or a
+broken interface** - because the run-1/run-2 miss (a mutable default argument later
+persisted; ruff owns the cause, no linter owns the consequence) is a demonstrated bug,
+and the carve-out needs no plumbing.
+The assumption is recorded as an assumption; where it fails, lint-class issues nothing
+else catches will go unreported. Acceptable for the skeleton and the S11 pilot; worth
+revisiting before wider rollout.
+
+**2. Clarity and naming nits - per-persona.** `fast` stays defects-only; `backend` and
+`frontend` gain a clarity category. The default pass on an untagged merge request stays
+quiet; a deliberately chosen persona may comment on readability, which is the thing an
+LLM reviewer can do that a linter cannot.
+
+**3. `fast` may report a performance blocker, at blocker severity only.** Run 8 showed
+`fast` dropping an unbounded query that run 7 rated `backend`'s top blocker, so the
+default persona could not report a classic production incident. `fast` is already
+`blockers_only`, so this is consistent rather than a widening.
+
+**4. Summary prose - template when findings exist, one model-written sentence when the
+review is clean.** Over-claiming risk is highest when there ARE findings; the
+zero-finding case has nothing to over-claim about and is exactly where a bare count
+reads as the bot not having tried. The output schema keeps a summary string but code
+consumes it **only** on the zero-finding path, and the prompt must say so or the model
+will write it every time and have it silently discarded. S3's persona statement and
+re-run hint stay template-owned in both cases.
+
+### Settled by firstmate as consequences of decisions already accepted
+
+**5. Category vocabulary - add `categories`, leave `review_focus` exactly as S3
+describes it.** Tickets 03, 06, 07 and 12 all already assume a machine-readable
+category that reaches a DuckDB column, so an id set is forced rather than newly chosen.
+Parsing the prose bullets was rejected because reformatting a bullet would silently
+change a category id and orphan historical feedback rows. S3's "not parsed
+programmatically" line stays true as written.
+
+**6. No `instructions` key.** Guidance like "silence is your normal output" is prompt
+content addressed to the model, and `review_focus` is already exactly that. Net schema
+change across decisions 5 and 6 is **one added field, not two.**
+
+**7. No `confidence` field** in the skeleton. The prompt already tells the model to drop
+what it is unsure of; a confidence field converts that suppression rule into a labelling
+rule and the noise arrives anyway. Self-reported confidence from a language model is
+weakly calibrated, and reviewer reactions are the better signal the feedback loop
+already exists to capture. Additive if wanted later.
+
+**8. The untrusted-diff gap became [14-diff-as-untrusted-input.md](14-diff-as-untrusted-input.md)** -
+a gap to file rather than a choice to make. Does not block the skeleton.
+
+**9. Independent evaluation is folded into the landing work**, not a separate project:
+a second worker writes its own test diffs, runs the landed files, and scores them
+against the prompt's own stated rules. Removes the self-grading problem for the part
+that matters. It does not measure whether reviewers find reviews *useful* - only S11's
+pilot can.
+
+## Carried to ticket 06
+
+The report recommends a **fixed org-wide category registry** rather than per-persona
+vocabularies, on the grounds that per-persona lists make S6's cross-persona curator
+query meaningless. Ticket 06 owns that decision.
