@@ -15,6 +15,9 @@ venv/
 .ruff_cache/
 .hypothesis/
 
+# codegraph's local code index — rebuilt per machine with `codegraph index`.
+.codegraph/
+
 # Local data stores and snapshots (idea.md §6/§7)
 *.duckdb
 *.duckdb.wal
