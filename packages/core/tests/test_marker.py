@@ -56,7 +56,7 @@ def a_finding(**overrides: object) -> Finding:
         "severity": "blocker",
         "body": "This drops the transaction.",
     }
-    return Finding(**{**defaults, **overrides})  # type: ignore[arg-type]
+    return Finding(**{**defaults, **overrides})  # ty: ignore[invalid-argument-type]
 
 
 def a_review(**overrides: object) -> Review:
@@ -65,7 +65,7 @@ def a_review(**overrides: object) -> Review:
         "persona": "backend",
         "head_sha": "9f8e7d6c5b4a39281706",
     }
-    return Review(**{**defaults, **overrides})  # type: ignore[arg-type]
+    return Review(**{**defaults, **overrides})  # ty: ignore[invalid-argument-type]
 
 
 field_text = st.text(max_size=40)

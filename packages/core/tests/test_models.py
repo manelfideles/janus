@@ -15,7 +15,7 @@ def a_finding(**overrides: object) -> Finding:
         "severity": "blocker",
         "body": "This drops the transaction.",
     }
-    return Finding(**{**defaults, **overrides})  # type: ignore[arg-type]
+    return Finding(**{**defaults, **overrides})  # ty: ignore[invalid-argument-type]
 
 
 def test_line_kind_is_closed_to_gitlabs_three_kinds() -> None:
@@ -32,7 +32,7 @@ def test_line_kind_rejects_anything_else() -> None:
 def test_finding_is_frozen() -> None:
     finding = a_finding()
     with pytest.raises(AttributeError):
-        finding.line_number = 13  # type: ignore[misc]
+        finding.line_number = 13  # ty: ignore[invalid-assignment]
 
 
 @pytest.mark.parametrize(
@@ -63,7 +63,7 @@ def test_review_requires_its_identifying_fields() -> None:
     ]:
         kwargs = {"review_id": "r1", "persona": "fast", "head_sha": "abc123", field: ""}
         with pytest.raises(ValueError, match=message):
-            Review(**kwargs)  # type: ignore[arg-type]
+            Review(**kwargs)  # ty: ignore[invalid-argument-type]
 
 
 def test_review_defaults_to_no_findings() -> None:

@@ -67,7 +67,7 @@ def test_every_problem_is_reported_at_once() -> None:
 def test_config_is_frozen() -> None:
     config = load_config({"MODEL_PROVIDER": "bedrock"})
     with pytest.raises(AttributeError):
-        config.global_diff_cap_tokens = 1  # type: ignore[misc]
+        config.global_diff_cap_tokens = 1  # ty: ignore[invalid-assignment]
 
 
 def test_the_real_environment_is_read_by_default(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -18,9 +18,9 @@ janus-core = { workspace = true }
 dev = [
     "janus-core",
     "hypothesis>=6.140",
-    "mypy>=1.18",
     "pytest>=8.4",
     "ruff>=0.14",
+    "ty>=0.0.73",
 ]
 
 # ---------------------------------------------------------------- ruff
@@ -29,6 +29,10 @@ dev = [
 line-length = 100
 target-version = "py313"
 src = ["packages/core"]
+# ruff formats Python inside Markdown code blocks, and `.scratch/` is the decision
+# board firstmate maintains, not project source. Linting it would couple `make lint`
+# to documents this repo does not own.
+extend-exclude = [".scratch"]
 
 [tool.ruff.lint]
 select = [
@@ -49,22 +53,21 @@ select = [
 # Test helpers are exercised, not called by name, so the return annotation adds nothing.
 "**/tests/**" = ["ANN401"]
 
-# ---------------------------------------------------------------- mypy
+# ---------------------------------------------------------------- ty
 
-[tool.mypy]
-python_version = "3.13"
-files = ["packages"]
-warn_unused_configs = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-# Baseline for packages other than `core`, which is stricter below (ticket 04).
-check_untyped_defs = true
+[tool.ty.environment]
+python-version = "3.13"
 
-[[tool.mypy.overrides]]
-# `core` owns the marker format and the shared models that tickets 03, 06, 07, 09
-# and 12 all depend on, so it is the one place a type error costs real debugging.
-module = "janus_core.*"
-strict = true
+[[tool.ty.overrides]]
+# Ticket 04 asked for the strictest type checking on `core` and a looser baseline
+# elsewhere. `ty` has no `strict` switch, so the equivalent is promoting every rule
+# to error-level under this path and leaving ty's defaults for the rest. `core` owns
+# the marker format and the shared models that tickets 03, 06, 07, 09 and 12 all
+# depend on, so it is the one place a type error costs real debugging.
+include = ["packages/core/**"]
+
+[tool.ty.overrides.rules]
+all = "error"
 
 # ---------------------------------------------------------------- pytest
 
