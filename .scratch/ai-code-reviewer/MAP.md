@@ -88,6 +88,14 @@ from fog.
   `categories`, because a machine-readable vocabulary is forced by tickets 03/06/07/12 -
   §3's free-prose `review_focus` is unchanged. See
   [08-prompt-and-persona-draft.md](issues/08-prompt-and-persona-draft.md).
+- **Sandbox: a project access token, Reporter role, on a throwaway GitLab.com
+  project.** `gitlab.com/manelfideles/janus-sandbox`, with credentials in the
+  gitignored `.env` as `GL_PAT` and `ANTHROPIC_API_KEY`. A project access token
+  replaced the second bot account §5/§6 assumed: its auto-created bot user still
+  satisfies feedback attribution, and it is confined to one project. It cannot serve
+  ticket 06's cross-project poller, which will need its own credential. `api` is the
+  narrowest scope GitLab offers for posting a note. See
+  [05-provision-local-sandbox.md](issues/05-provision-local-sandbox.md).
 
 ## Not yet specified
 
