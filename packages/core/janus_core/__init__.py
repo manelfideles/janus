@@ -3,8 +3,8 @@
 See ``README.md`` in this package for why it exists and why it stays small.
 """
 
-from ai_reviewer_core.config import Config, ConfigError, ModelProvider, load_config
-from ai_reviewer_core.marker import (
+from janus_core.config import Config, ConfigError, ModelProvider, load_config
+from janus_core.marker import (
     MARKER_PREFIX,
     MARKER_VERSION,
     Marker,
@@ -18,7 +18,7 @@ from ai_reviewer_core.marker import (
     parse_marker,
     render_marker,
 )
-from ai_reviewer_core.models import Finding, LineKind, Review
+from janus_core.models import Finding, LineKind, Review
 
 __all__ = [
     "MARKER_PREFIX",

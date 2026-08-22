@@ -1,4 +1,4 @@
-# ai-reviewer-core
+# janus-core
 
 Shared code for the janus review job and the feedback collector.
 

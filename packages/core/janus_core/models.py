@@ -92,7 +92,7 @@ class Review:
     ``review_id`` groups a review's comments for the feedback store (ticket 07's natural
     key). It does **not** identify a finding and cannot deduplicate one: a crashed job's
     re-run is a new process that mints a new id. That job belongs to
-    :func:`ai_reviewer_core.marker.finding_fid`.
+    :func:`janus_core.marker.finding_fid`.
     """
 
     review_id: str

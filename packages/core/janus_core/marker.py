@@ -35,7 +35,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Final
 
-from ai_reviewer_core.models import Finding, Review
+from janus_core.models import Finding, Review
 
 __all__ = [
     "MARKER_PREFIX",

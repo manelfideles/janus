@@ -2,7 +2,7 @@
 
 import pytest
 
-from ai_reviewer_core.models import Finding, LineKind, Review
+from janus_core.models import Finding, LineKind, Review
 
 
 def a_finding(**overrides: object) -> Finding:

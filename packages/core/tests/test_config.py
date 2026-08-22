@@ -2,7 +2,7 @@
 
 import pytest
 
-from ai_reviewer_core.config import (
+from janus_core.config import (
     DEFAULT_GLOBAL_DIFF_CAP_TOKENS,
     Config,
     ConfigError,

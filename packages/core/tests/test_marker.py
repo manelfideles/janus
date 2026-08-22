@@ -13,7 +13,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from ai_reviewer_core.marker import (
+from janus_core.marker import (
     MARKER_PREFIX,
     MARKER_VERSION,
     Marker,
@@ -26,7 +26,7 @@ from ai_reviewer_core.marker import (
     parse_marker,
     render_marker,
 )
-from ai_reviewer_core.models import Finding, LineKind, Review
+from janus_core.models import Finding, LineKind, Review
 
 # ---------------------------------------------------------------- fixtures
 

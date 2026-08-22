@@ -4,14 +4,9 @@ requires-python = "==3.13.*"
 
 [manifest]
 members = [
-    "ai-reviewer-core",
     "janus",
+    "janus-core",
 ]
-
-[[package]]
-name = "ai-reviewer-core"
-version = "0.1.0"
-source = { editable = "packages/core" }
 
 [[package]]
 name = "ast-serialize"
@@ -132,8 +127,8 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
-    { name = "ai-reviewer-core" },
     { name = "hypothesis" },
+    { name = "janus-core" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
@@ -143,12 +138,17 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "ai-reviewer-core", editable = "packages/core" },
     { name = "hypothesis", specifier = ">=6.140" },
+    { name = "janus-core", editable = "packages/core" },
     { name = "mypy", specifier = ">=1.18" },
     { name = "pytest", specifier = ">=8.4" },
     { name = "ruff", specifier = ">=0.14" },
 ]
+
+[[package]]
+name = "janus-core"
+version = "0.1.0"
+source = { editable = "packages/core" }
 
 [[package]]
 name = "librt"
