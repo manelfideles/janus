@@ -13,7 +13,10 @@ __pycache__/
 venv/
 .pytest_cache/
 .ruff_cache/
-.mypy_cache/
+.hypothesis/
+
+# codegraph's local code index — rebuilt per machine with `codegraph index`.
+.codegraph/
 
 # Local data stores and snapshots (idea.md §6/§7)
 *.duckdb
