@@ -11,13 +11,43 @@ than re-deciding it. `.scratch/ai-code-reviewer/MAP.md` lists what is still open
 
 ## Commands
 
+The `Makefile` is the entry point. It stays plain on purpose — see the rtk section below.
+
 ```sh
-uv sync                     # from a clean checkout; uv manages the interpreter
-uv run pytest               # tests are colocated in packages/<pkg>/tests
-uv run ruff check           # lint
-uv run ruff format --check  # format
-uv run mypy                 # strict on ai_reviewer_core, looser elsewhere
+make setup      # uv sync from a clean checkout; uv manages the interpreter
+make test       # pytest; tests are colocated in packages/<pkg>/tests
+make typecheck  # ty check packages/core
+make lint       # ruff check + ruff format --check
+make lint_fix   # ruff check --fix + ruff format
 ```
+
+Type checking is `ty`, not mypy. `ty` has no `strict` switch, so ticket 04's "strict on
+`core`, looser elsewhere" is expressed as a `[[tool.ty.overrides]]` block in the root
+`pyproject.toml` that promotes every rule to error-level under `packages/core/**`.
+Ruff's `ANN` rules are the "annotations are present" half of that gate; `ty` checks that
+they are correct. Suppressions use ty syntax (`# ty: ignore[rule-name]`), not mypy's.
+
+## Running commands through rtk
+
+The captain runs `rtk`, a CLI proxy that compresses command output before it reaches an
+agent's context. An agent working in this repo calls the Makefile targets through it:
+
+```sh
+rtk test make test        # only failures
+rtk err make typecheck    # only errors and warnings
+rtk err make lint         # only errors and warnings
+```
+
+A human or a CI job runs `make test` and friends directly.
+
+Keep rtk *out* of the Makefile. rtk exists to compress output for an agent's context, so
+baking it in would also compress it for the human reading the terminal and hide detail
+they may want. The Makefile stays plain; the wrapper is the caller's choice.
+
+There is no `rtk` subcommand for `uv`, `make`, or `ty`, which is why the general `rtk err`
+and `rtk test` wrappers are the route. `rtk git`, `rtk gh` and `rtk glab` wrap those CLIs.
+`rtk format` understands `ruff format`. `rtk ruff` and `rtk pytest` also exist, but they
+call the tools directly and so bypass the Makefile.
 
 ## Layout, and the rule that makes it worth the ceremony
 
@@ -38,9 +68,15 @@ Size of `core` is a CI concern, not only taste.
 Tests are colocated per package because the path-based CI rules need a change under
 `packages/collector/` to trigger only the collector deploy.
 
+Each package is a directory package at `packages/<pkg>/<import_name>/`, with no `src/`
+layer. Bare top-level modules were tried and rejected: uv's build backend requires a
+directory package, and three packages each exposing a bare `config.py` would collide
+silently on `sys.path`. Distribution names track import names (`janus-core` /
+`janus_core`) so the two never have to be mapped in your head.
+
 ## Sharp edges
 
-- **`ai_reviewer_core.marker` is a wire format, not a struct.** The reviewer writes
+- **`janus_core.marker` is a wire format, not a struct.** The reviewer writes
   markers and the collector parses them, and they deploy separately. Never change
   the payload without bumping `MARKER_VERSION` and teaching the parser both
   versions. A silent drift breaks feedback attribution with no error at all — rows
