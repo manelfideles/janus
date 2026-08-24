@@ -4,7 +4,7 @@ Status: open
 Labels: wayfinder:ticket, wayfinder:grilling
 Parent: ../MAP.md
 Assignee: unassigned
-Blocked by: 10-diff-size-cap.md
+Blocked by: — (10-diff-size-cap.md closed 2026-08-21; its cap was measured and confirmed 2026-08-24)
 Blocks: —
 
 ## Question

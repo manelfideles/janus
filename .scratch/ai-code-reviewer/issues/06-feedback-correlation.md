@@ -4,7 +4,7 @@ Status: open
 Labels: wayfinder:ticket, wayfinder:grilling
 Parent: ../MAP.md
 Assignee: unassigned
-Blocked by: — (03-last-reviewed-sha-storage.md closed 2026-08-21)
+Blocked by: —
 Blocks: 07-duckdb-schema.md
 
 ## Question

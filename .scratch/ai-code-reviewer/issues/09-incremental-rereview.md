@@ -4,7 +4,7 @@ Status: open
 Labels: wayfinder:ticket, wayfinder:grilling
 Parent: ../MAP.md
 Assignee: unassigned
-Blocked by: — (01-agent-architecture.md and 03-last-reviewed-sha-storage.md both closed 2026-08-21)
+Blocked by: —
 
 ## Question
 
