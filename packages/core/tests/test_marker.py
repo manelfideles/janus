@@ -52,6 +52,7 @@ def a_finding(**overrides: object) -> Finding:
         "old_path": "src/app.py",
         "line_kind": LineKind.ADDED,
         "line_number": 12,
+        "line_text": "    session.rollback()",
         "category": "data_integrity",
         "severity": "blocker",
         "body": "This drops the transaction.",
@@ -104,9 +105,8 @@ def test_summary_marker_omits_category_and_fid() -> None:
 
 
 def test_finding_marker_carries_the_dedup_key() -> None:
-    review, finding = a_review(), a_finding()
-    marker = marker_for_finding(review, finding)
-    assert marker.dedup_key == (review.head_sha, finding_fid(finding))
+    marker = marker_for_finding(a_review(), a_finding())
+    assert marker.dedup_key == finding_fid(a_finding())
 
 
 # ---------------------------------------------------------------- round trips
@@ -308,15 +308,15 @@ def test_fid_is_twelve_hex_characters() -> None:
     assert set(fid) <= set("0123456789abcdef")
 
 
-def test_fid_ignores_the_findings_words() -> None:
-    """The model is not deterministic. A text-derived fid would re-post everything."""
+def test_fid_ignores_the_models_prose() -> None:
+    """The model is not deterministic. A prose-derived fid would re-post everything."""
     first = finding_fid(a_finding(body="This drops the transaction."))
     second = finding_fid(a_finding(body="The transaction is never committed here."))
     assert first == second
 
 
 def test_fid_ignores_severity() -> None:
-    # Severity is not one of ticket 12's five inputs.
+    # Severity is not one of the fid's inputs.
     assert finding_fid(a_finding(severity="blocker")) == finding_fid(a_finding(severity="minor"))
 
 
@@ -326,7 +326,7 @@ def test_fid_ignores_severity() -> None:
         {"new_path": "src/other.py"},
         {"old_path": "src/other.py"},
         {"line_kind": LineKind.CONTEXT},
-        {"line_number": 13},
+        {"line_text": "    session.commit()"},
         {"category": "performance"},
     ],
 )
@@ -335,16 +335,33 @@ def test_fid_changes_with_each_of_its_five_inputs(overrides: dict[str, object]) 
 
 
 def test_fid_matches_the_specified_derivation() -> None:
-    """Pinned against ticket 12's formula, computed independently of the module."""
-    finding = a_finding()
-    expected = hashlib.sha256(b"src/app.py|src/app.py|added|12|data_integrity").hexdigest()
-    assert finding_fid(finding) == expected[:12]
+    """Pinned against the formula, computed independently of the module."""
+    framed = "".join(
+        f"{len(part)}:{part}"
+        for part in ("src/app.py", "src/app.py", "added", "session.rollback()", "data_integrity")
+    )
+    expected = hashlib.sha256(framed.encode("utf-8")).hexdigest()
+    assert finding_fid(a_finding()) == expected[:12]
+
+
+def test_no_field_value_can_imitate_a_field_boundary() -> None:
+    """Line text is free-form now, so the framing must not be ambiguous."""
+    left = a_finding(new_path="src/a|b.py", old_path="src/c.py")
+    right = a_finding(new_path="src/a.py", old_path="src/b|c.py")
+    assert finding_fid(left) != finding_fid(right)
 
 
 def test_two_findings_on_one_line_in_one_category_collapse() -> None:
     """The accepted collision from ticket 12: one comment per line per category."""
     first = a_finding(body="first thing")
     second = a_finding(body="second thing")
+    assert finding_fid(first) == finding_fid(second)
+
+
+def test_two_identical_lines_in_one_file_collapse_too() -> None:
+    """The collision widened when the key moved from position to text. On the record."""
+    first = a_finding(line_number=12, line_text="    except Exception: pass")
+    second = a_finding(line_number=40, line_text="    except Exception: pass")
     assert finding_fid(first) == finding_fid(second)
 
 
@@ -356,12 +373,62 @@ def test_the_dedup_key_survives_a_write_and_read() -> None:
     # The collector, a separate deployment, reads it back.
     parsed = parse_marker(posted)
     assert parsed is not None
-    assert parsed.dedup_key == (review.head_sha, finding_fid(finding))
+    assert parsed.dedup_key == finding_fid(finding)
 
 
-def test_the_dedup_key_discriminates_on_head_sha() -> None:
-    finding = a_finding()
-    old = marker_for_finding(a_review(head_sha="aaaa"), finding)
-    new = marker_for_finding(a_review(head_sha="bbbb"), finding)
-    assert old.fid == new.fid
-    assert old.dedup_key != new.dedup_key
+# ------------------------------------------------- the re-review idempotency cases
+#
+# Measured against the live GitLab API: an insertion above a finding moved it from
+# line 21 to line 26 with its code untouched, and the fid changed with it, so the
+# whole review was posted a second time. These four are that defect, and its edges.
+
+
+def test_a_moved_line_on_unchanged_code_keeps_its_fingerprint() -> None:
+    """The defect itself. Only the line number moved -- the code did not."""
+    before = a_finding(line_number=21)
+    after = a_finding(line_number=26)
+    assert finding_fid(before) == finding_fid(after)
+
+
+def test_changed_line_text_gets_a_different_fingerprint() -> None:
+    """The other half: real change must still re-post, or the fix over-suppresses."""
+    before = a_finding(line_text="    session.rollback()")
+    after = a_finding(line_text="    session.commit()")
+    assert finding_fid(before) != finding_fid(after)
+
+
+def test_two_reviews_at_different_commits_on_unchanged_code_dedup_together() -> None:
+    """Every push mints a new head. That must not, by itself, re-post anything."""
+    finding = a_finding(line_number=21)
+    moved = a_finding(line_number=26)
+
+    first = marker_for_finding(a_review(review_id="r1", head_sha="d96020dc3016"), finding)
+    second = marker_for_finding(a_review(review_id="r2", head_sha="549ea6a0af17"), moved)
+
+    assert first.head_sha != second.head_sha
+    assert first.dedup_key == second.dedup_key
+
+
+def test_re_indenting_a_line_keeps_its_fingerprint() -> None:
+    """A formatter run changes leading whitespace and nothing a comment was about."""
+    before = a_finding(line_text="    session.rollback()")
+    after = a_finding(line_text="        session.rollback()  ")
+    assert finding_fid(before) == finding_fid(after)
+
+
+def test_interior_whitespace_still_counts() -> None:
+    """Stripping the ends is the whole normalisation. `core` does not parse code."""
+    before = a_finding(line_text="a = f(x, y)")
+    after = a_finding(line_text="a = f(x,y)")
+    assert finding_fid(before) != finding_fid(after)
+
+
+@given(st.integers(min_value=1, max_value=10_000), st.integers(min_value=1, max_value=10_000))
+def test_no_line_number_ever_changes_the_fingerprint(first: int, second: int) -> None:
+    assert finding_fid(a_finding(line_number=first)) == finding_fid(a_finding(line_number=second))
+
+
+@given(st.text(max_size=40), st.text(alphabet=" \t\v\f", max_size=8))
+def test_padding_a_line_never_changes_the_fingerprint(text: str, pad: str) -> None:
+    padded = a_finding(line_text=pad + text + pad)
+    assert finding_fid(a_finding(line_text=text)) == finding_fid(padded)

@@ -106,42 +106,98 @@ class Marker:
     version: int = MARKER_VERSION
 
     @property
-    def dedup_key(self) -> tuple[str, str] | None:
-        """Ticket 12's idempotency key, ``(head_sha, fid)``, or ``None`` for a summary.
+    def dedup_key(self) -> str | None:
+        """Ticket 12's idempotency key -- the ``fid`` alone -- or ``None`` for a summary.
 
         ``review_id`` cannot do this job: a crashed job's re-run is a new process and
         mints a new id, so nothing would match and every comment would be posted twice.
+
+        **``head_sha`` is deliberately not part of it.** It used to be, and that was the
+        bug: every push mints a new head, so the key never matched across reviews and a
+        re-review re-posted every finding. It also bought nothing, because the
+        discrimination it looked like it provided is already in the ``fid`` --
+        :func:`finding_fid` hashes the diff line's text, so a finding whose line really
+        changed gets a different ``fid`` and correctly re-posts, while a finding on
+        untouched code keeps its ``fid`` and is correctly suppressed. Keying on the
+        commit could only add re-posts, never remove one.
+
+        The marker still *carries* ``head_sha``: that is ticket 03's last-reviewed-commit
+        channel, and it is a separate job from deduplication.
         """
-        if self.fid is None:
-            return None
-        return (self.head_sha, self.fid)
+        return self.fid
 
 
 def finding_fid(finding: Finding) -> str:
-    """Ticket 12's content-independent fingerprint of a finding.
+    """Ticket 12's fingerprint of a finding: what makes a re-review idempotent.
 
-    ``sha256(new_path|old_path|line_kind|line_number|category)`` truncated to 12 hex
-    characters.
+    A sha256 over ``new_path``, ``old_path``, ``line_kind``, ``line_text`` and
+    ``category``, truncated to 12 hex characters. ``line_text`` is stripped of leading
+    and trailing whitespace first, and the fields are framed by :func:`_digest` rather
+    than simply joined.
 
     Every input is produced by code, never by the model: the diff walk supplies the
-    paths, the kind and the line, and ticket 01 established that code owns the category.
-    The finding's **text is deliberately excluded** -- the model is not deterministic, so
-    a re-run of the same commit may phrase the same finding differently, and a
-    text-derived fingerprint would fail to match and re-post every comment.
+    paths, the kind and the line text, and ticket 01 established that code owns the
+    category.
+
+    **Two different kinds of text, and only one of them is here.** The *model's* prose --
+    ``finding.body`` -- is excluded, because the model is not deterministic and a re-run
+    may word the same finding differently, so a prose-derived fingerprint would fail to
+    match and re-post every comment. The *diff's* text -- ``finding.line_text`` -- is
+    included, because the diff is deterministic: the same commit walked twice yields the
+    same line, character for character. A future reader who collapses these two into
+    "text is excluded" will reintroduce the bug this function was written to fix.
+
+    **The line number is not an input.** It was, and it was wrong: an insertion anywhere
+    above a finding moves its line number while leaving the code it is about untouched,
+    so the fingerprint changed and the comment was posted a second time. Line text
+    survives such an insertion; a line number does not. ``line_number`` stays on
+    :class:`~janus_core.models.Finding` because the posting code needs it to place the
+    comment -- it just no longer decides identity.
+
+    **Whitespace is stripped at the ends, and left alone inside.** Leading and trailing
+    whitespace is what mechanical reformatting churns -- a re-indent, a tab-to-space
+    migration, an editor trimming line ends -- and none of it changes what a review
+    comment was about, so a fid that moved with it would re-post a whole file's findings
+    after a formatter run. Interior whitespace is kept exactly: normalising it would need
+    to know the language, which ``core`` deliberately does not, and would fold together
+    lines a reader sees as different. The accepted cost is that in an
+    indentation-sensitive language a line moved into another block keeps its fid and its
+    comment is suppressed; that costs one missing re-post on a thread GitLab still
+    renders against the right code, which is cheaper than the churn.
 
     The accepted collision: two findings on the same line in the same category collapse
     to one ``fid``, and the second is suppressed as a duplicate. One comment per line per
-    category is a reasonable noise ceiling.
+    category is a reasonable noise ceiling. Keying on line text rather than line number
+    widens that collision slightly -- two *identical* lines in one file now collapse too,
+    so a file with the same ``except Exception: pass`` twice gets one comment for the
+    category rather than two. That is the same noise ceiling reasoned about the code
+    instead of its position, and it is the price of surviving an insertion.
+
+    Note for the wire format: ``fid`` is an opaque string to :func:`parse_marker`, so
+    changing this function is not a payload change and does not need a
+    ``MARKER_VERSION`` bump. It does mean fids written by an older build never match
+    fids computed by this one, so merge requests already reviewed pay one round of
+    re-posts.
     """
     parts = (
         finding.new_path,
         finding.old_path,
         finding.line_kind.value,
-        str(finding.line_number),
+        finding.line_text.strip(),
         finding.category,
     )
-    digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
-    return digest[:FID_LENGTH]
+    return _digest(parts)[:FID_LENGTH]
+
+
+def _digest(parts: tuple[str, ...]) -> str:
+    """Hash a field tuple so that no field's content can imitate the field boundary.
+
+    Each part is length-prefixed rather than merely joined by a separator. One of the
+    parts is now free-form source text, and a ``|`` in it would otherwise let two
+    different tuples -- ``("a|b", "c")`` and ``("a", "b|c")`` -- hash identically.
+    """
+    framed = "".join(f"{len(part)}:{part}" for part in parts)
+    return hashlib.sha256(framed.encode("utf-8")).hexdigest()
 
 
 def marker_for_finding(review: Review, finding: Finding) -> Marker:

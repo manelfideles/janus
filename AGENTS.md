@@ -81,6 +81,16 @@ silently on `sys.path`. Distribution names track import names (`janus-core` /
   the payload without bumping `MARKER_VERSION` and teaching the parser both
   versions. A silent drift breaks feedback attribution with no error at all — rows
   just stop matching. Its docstring carries the compatibility rules.
+- **A finding's identity is its diff line's text, never its line number.**
+  `finding_fid` hashes `line_text`; `Marker.dedup_key` is the `fid` alone. A line number
+  moves when anything above it is inserted, and every push mints a new `head_sha`, so
+  either one in the key re-posts the whole review on its second run. The marker keeps
+  carrying `head_sha` for ticket 03's last-reviewed-commit channel, which is a different
+  job. `finding_fid`'s docstring carries the whitespace and collision reasoning.
+- **GitLab never mis-anchors a moved comment**, measured live: threads on the previous
+  head are traced forward, older threads stay frozen and still render against the code
+  they were written about, and posting with a stale `head_sha` returns 201 re-anchored.
+  So there is no stale-position handling to build. Do not add one.
 - **`LineKind` is closed on purpose.** GitLab infers a diff line's kind purely from
   which line numbers the `position` hash carries, and omit means omit — not `null`,
   not `0`. Ticket 02 has the table.

@@ -11,6 +11,7 @@ def a_finding(**overrides: object) -> Finding:
         "old_path": "src/app.py",
         "line_kind": LineKind.ADDED,
         "line_number": 12,
+        "line_text": "    session.rollback()",
         "category": "data_integrity",
         "severity": "blocker",
         "body": "This drops the transaction.",
@@ -48,6 +49,11 @@ def test_finding_is_frozen() -> None:
 def test_finding_rejects_unusable_values(overrides: dict[str, object], expected: str) -> None:
     with pytest.raises(ValueError, match=expected):
         a_finding(**overrides)
+
+
+def test_finding_allows_a_blank_line() -> None:
+    # A diff line may be blank, so empty line text is legitimate, not a missing value.
+    assert a_finding(line_text="").line_text == ""
 
 
 def test_finding_allows_a_rename() -> None:
