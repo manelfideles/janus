@@ -53,6 +53,13 @@ class Finding:
     therefore needs its old-side number recovered from the diff walk before it can be
     positioned; that belongs to the reviewer package, which is a later slice.
 
+    ``line_text`` is that line's text as the diff carries it, without the leading ``+``,
+    ``-`` or space marker and without the line ending. It comes from the same diff walk
+    as the paths, the kind and the number -- **not** from the model. It is what
+    :func:`janus_core.marker.finding_fid` fingerprints, so that a finding keeps its
+    identity when an unrelated insertion moves it down the file. An empty string is
+    legitimate: a diff line may be blank.
+
     ``category`` derives from the persona's ``review_focus`` bullets (ticket 01), which
     idea.md §3 keeps as free text -- so it is a plain string, not an enum.
 
@@ -65,6 +72,7 @@ class Finding:
     old_path: str
     line_kind: LineKind
     line_number: int
+    line_text: str
     category: str
     severity: str
     body: str
